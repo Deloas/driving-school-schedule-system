@@ -32,3 +32,6 @@ Thumbs.db
 # Docker local data
 mysql-data/
 redis-data/
+
+# Claude Code local config
+.claude/
