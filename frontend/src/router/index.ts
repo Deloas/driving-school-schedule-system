@@ -24,6 +24,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'vehicles', name: 'VehicleManage', component: () => import('@/views/admin/VehicleManageView.vue'), meta: { title: '车辆管理' } },
       { path: 'schedules', name: 'ScheduleManage', component: () => import('@/views/admin/ScheduleManageView.vue'), meta: { title: '排班管理' } },
       { path: 'users', name: 'UserManage', component: () => import('@/views/admin/UserManageView.vue'), meta: { title: '账号管理' } },
+      { path: 'training-records', name: 'TrainingRecordManage', component: () => import('@/views/admin/TrainingRecordManageView.vue'), meta: { title: '练车记录' } },
     ],
   },
   {
@@ -39,6 +40,7 @@ const routes: RouteRecordRaw[] = [
     children: [
       { path: '', redirect: '/student/reservations' },
       { path: 'reservations', name: 'StudentReservations', component: () => import('@/views/student/ReservationView.vue'), meta: { title: '预约练车' } },
+      { path: 'training-records', name: 'StudentTrainingRecords', component: () => import('@/views/student/TrainingRecordView.vue'), meta: { title: '练车记录' } },
     ],
   },
 ]

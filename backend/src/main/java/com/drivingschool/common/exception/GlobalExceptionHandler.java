@@ -2,7 +2,9 @@ package com.drivingschool.common.exception;
 
 import com.drivingschool.common.result.Result;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -36,6 +38,23 @@ public class GlobalExceptionHandler {
     public Result<Void> handleAccessDeniedException(AccessDeniedException e) {
         log.warn("权限不足：{}", e.getMessage());
         return Result.error(403, "没有权限访问该资源");
+    }
+
+    /** @Valid 校验失败 → 返回第一条错误信息 */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public Result<Void> handleValidation(MethodArgumentNotValidException e) {
+        String msg = e.getBindingResult().getFieldErrors().stream()
+                .map(err -> err.getDefaultMessage())
+                .findFirst().orElse("参数校验失败");
+        log.warn("参数校验失败：{}", msg);
+        return Result.error(400, msg);
+    }
+
+    /** 请求体无法解析（空 body、格式错误、中文乱码等） */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public Result<Void> handleNotReadable(HttpMessageNotReadableException e) {
+        log.warn("请求体解析失败：{}", e.getMessage());
+        return Result.error(400, "请求参数格式错误，请检查后重试");
     }
 
     @ExceptionHandler(Exception.class)

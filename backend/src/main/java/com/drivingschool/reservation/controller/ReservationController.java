@@ -86,4 +86,23 @@ public class ReservationController {
     public Result<Page<ReservationVO>> list(ReservationQueryDTO dto) {
         return Result.success(reservationService.adminQuery(dto));
     }
+
+    /** M8：教练完成练车 */
+    @PostMapping("/{id}/complete")
+    @PreAuthorize("hasRole('COACH')")
+    public Result<String> complete(@PathVariable Long id, @Valid @RequestBody com.drivingschool.training.dto.TrainingCompleteDTO dto) {
+        Long coachId = SecurityContextUtils.getCurrentUser().getRelatedId();
+        reservationService.complete(id, dto, coachId);
+        return Result.success("练车完成");
+    }
+
+    /** M8：教练标记学员缺席 */
+    @PostMapping("/{id}/absent")
+    @PreAuthorize("hasRole('COACH')")
+    public Result<String> absent(@PathVariable Long id, @RequestBody(required = false) com.drivingschool.training.dto.TrainingAbsentDTO dto) {
+        if (dto == null) dto = new com.drivingschool.training.dto.TrainingAbsentDTO();
+        Long coachId = SecurityContextUtils.getCurrentUser().getRelatedId();
+        reservationService.markAbsent(id, dto.getReason(), coachId);
+        return Result.success("已标记缺席");
+    }
 }

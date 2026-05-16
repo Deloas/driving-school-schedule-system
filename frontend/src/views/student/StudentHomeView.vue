@@ -29,6 +29,9 @@ const isActive = (path: string) => route.path === path
           <router-link to="/student/reservations" :class="['text-sm transition-colors', isActive('/student/reservations') ? 'text-primary-600 font-medium' : 'text-gray-500 hover:text-primary-600']">
             预约练车
           </router-link>
+          <router-link to="/student/training-records" :class="['text-sm transition-colors', isActive('/student/training-records') ? 'text-primary-600 font-medium' : 'text-gray-500 hover:text-primary-600']">
+            练车记录
+          </router-link>
           <button @click="handleLogout" class="text-sm text-gray-400 hover:text-gray-600 transition-colors">退出</button>
         </div>
       </div>

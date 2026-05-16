@@ -22,4 +22,8 @@ public interface ReservationService {
     Page<ReservationVO> coachToday(Long coachId, LocalDate date, Integer page, Integer size);
     /** 管理员分页查询全部预约 */
     Page<ReservationVO> adminQuery(ReservationQueryDTO dto);
+    /** M8：教练完成练车 */
+    void complete(Long reservationId, com.drivingschool.training.dto.TrainingCompleteDTO dto, Long coachId);
+    /** M8：教练标记缺席 */
+    void markAbsent(Long reservationId, String reason, Long coachId);
 }

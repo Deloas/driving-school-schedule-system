@@ -54,6 +54,7 @@ public class ReservationServiceImpl implements ReservationService {
     private final VehicleMapper vehicleMapper;
     private final RedissonClient redissonClient;
     private final StringRedisTemplate stringRedisTemplate;
+    private final com.drivingschool.training.mapper.TrainingRecordMapper trainingRecordMapper;
 
     @Override
     public ReservationOptionVO getOptions(Long studentId, LocalDate date, String timeSlot) {
@@ -351,6 +352,62 @@ public class ReservationServiceImpl implements ReservationService {
             opt.setPlateNumber(v != null ? v.getPlateNumber() : null);
         }
     }
+
+    // ==================== M8：完成练车 + 标记缺席 ====================
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void complete(Long reservationId, com.drivingschool.training.dto.TrainingCompleteDTO dto, Long coachId) {
+        Reservation r = reservationMapper.selectById(reservationId);
+        if (r == null) throw new BusinessException("预约不存在");
+        if (!"SUCCESS".equals(r.getStatus())) throw new BusinessException("该预约已" + r.getStatus() + "，不能完成练车");
+        if (!coachId.equals(r.getActualCoachId())) throw new BusinessException("只有实际带练教练可以完成该预约");
+
+        // 更新预约状态
+        r.setStatus("COMPLETED");
+        reservationMapper.updateById(r);
+
+        // 生成练车记录（durationMinutes 附加到备注中）
+        String remark = dto.getCoachRemark();
+        if (dto.getDurationMinutes() != null && dto.getDurationMinutes() > 0) {
+            remark = (remark != null ? remark + " " : "") + "(练车时长: " + dto.getDurationMinutes() + " 分钟)";
+        }
+
+        com.drivingschool.training.entity.TrainingRecord tr = new com.drivingschool.training.entity.TrainingRecord();
+        tr.setReservationId(r.getId());
+        tr.setStudentId(r.getStudentId());
+        tr.setCoachId(r.getActualCoachId());
+        tr.setVehicleId(r.getVehicleId());
+        tr.setTrainingDate(r.getReservationDate());
+        tr.setTimeSlot(r.getTimeSlot());
+        tr.setTrainingContent(dto.getTrainingContent());
+        tr.setCoachComment(remark);
+        tr.setResult("COMPLETED");
+        trainingRecordMapper.insert(tr);
+
+        // 学员已完成练车次数 +1
+        Student student = studentMapper.selectById(r.getStudentId());
+        if (student != null) {
+            student.setCompletedTrainingCount(student.getCompletedTrainingCount() + 1);
+            studentMapper.updateById(student);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void markAbsent(Long reservationId, String reason, Long coachId) {
+        Reservation r = reservationMapper.selectById(reservationId);
+        if (r == null) throw new BusinessException("预约不存在");
+        if (!"SUCCESS".equals(r.getStatus())) throw new BusinessException("该预约已" + r.getStatus() + "，不能标记缺席");
+        if (!coachId.equals(r.getActualCoachId())) throw new BusinessException("只有实际带练教练可以标记该预约");
+
+        r.setStatus("ABSENT");
+        r.setCancelReason(reason);
+        reservationMapper.updateById(r);
+        // 缺席不生成 training_record，不增加 completed_training_count
+    }
+
+    // ==================== 内部方法 ====================
 
     private ReservationVO toVO(Reservation r) {
         ReservationVO vo = new ReservationVO();

@@ -27,6 +27,7 @@ const menuItems = [
   { path: '/admin/vehicles', icon: 'truck', label: '车辆管理' },
   { path: '/admin/schedules', icon: 'calendar', label: '排班管理' },
   { path: '/admin/users', icon: 'key', label: '账号管理' },
+  { path: '/admin/training-records', icon: 'clipboard', label: '练车记录' },
 ]
 
 /** 判断当前路由是否激活 */
