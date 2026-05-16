@@ -63,28 +63,75 @@ public class ReservationServiceImpl implements ReservationService {
         ReservationOptionVO vo = new ReservationOptionVO();
         ReservationOptionVO.MainCoachOption opt = new ReservationOptionVO.MainCoachOption();
 
-        CoachSchedule schedule = scheduleMapper.selectOne(new LambdaQueryWrapper<CoachSchedule>()
+        // 查询主教练排班
+        CoachSchedule mainSchedule = scheduleMapper.selectOne(new LambdaQueryWrapper<CoachSchedule>()
                 .eq(CoachSchedule::getCoachId, student.getMainCoachId())
                 .eq(CoachSchedule::getScheduleDate, date)
                 .eq(CoachSchedule::getTimeSlot, timeSlot));
 
-        if (schedule == null) {
+        boolean mainFull = false;
+
+        if (mainSchedule == null) {
             opt.setAvailable(false);
             opt.setMessage("当前日期和时间段暂无排班，请选择其他时间");
-        } else if (!"OPEN".equals(schedule.getStatus())) {
+            mainFull = true;
+        } else if (!"OPEN".equals(mainSchedule.getStatus())) {
             opt.setAvailable(false);
             opt.setMessage("该时间段排班已关闭");
-        } else if (schedule.getCurrentStudents() >= schedule.getMaxStudents()) {
-            fillMinimalOption(opt, schedule);
+            mainFull = true;
+        } else if (mainSchedule.getCurrentStudents() >= mainSchedule.getMaxStudents()) {
+            fillMinimalOption(opt, mainSchedule);
             opt.setAvailable(false);
-            opt.setMessage("主教练当前时间段已满员，请选择其他时间段");
+            opt.setMessage("主教练当前时间段已满员，可选择调剂");
+            mainFull = true; // M7: 主教练满员 → 推荐调剂
         } else {
-            fillFullOption(opt, schedule);
+            fillFullOption(opt, mainSchedule);
             opt.setAvailable(true);
             opt.setMessage("可预约");
         }
 
         vo.setMainCoachOption(opt);
+
+        // M7: 主教练不可用 → 查询可调剂教练
+        if (mainFull) {
+            var adjustList = scheduleMapper.selectList(new LambdaQueryWrapper<CoachSchedule>()
+                    .eq(CoachSchedule::getScheduleDate, date)
+                    .eq(CoachSchedule::getTimeSlot, timeSlot)
+                    .eq(CoachSchedule::getStatus, "OPEN")
+                    .apply("current_students < max_students"))
+                    .stream()
+                    .filter(s -> !s.getCoachId().equals(student.getMainCoachId())) // 排除主教练
+                    .filter(s -> {
+                        Coach c = coachMapper.selectById(s.getCoachId());
+                        return c != null && "NORMAL".equals(c.getStatus());
+                    })
+                    .sorted((a, b) -> Integer.compare(
+                            b.getMaxStudents() - b.getCurrentStudents(),
+                            a.getMaxStudents() - a.getCurrentStudents()))
+                    .limit(5)
+                    .map(s -> {
+                        ReservationOptionVO.AdjustOption ao = new ReservationOptionVO.AdjustOption();
+                        ao.setScheduleId(s.getId());
+                        ao.setCoachId(s.getCoachId());
+                        ao.setCurrentStudents(s.getCurrentStudents());
+                        ao.setMaxStudents(s.getMaxStudents());
+                        ao.setRemainCount(s.getMaxStudents() - s.getCurrentStudents());
+                        ao.setRecommendReason("该教练当前剩余 " + ao.getRemainCount() + " 个名额");
+                        Coach c = coachMapper.selectById(s.getCoachId());
+                        ao.setCoachName(c != null ? c.getName() : "未知");
+                        if (s.getVehicleId() != null) {
+                            Vehicle v = vehicleMapper.selectById(s.getVehicleId());
+                            if (v != null && "NORMAL".equals(v.getStatus())) {
+                                ao.setVehicleId(s.getVehicleId());
+                                ao.setPlateNumber(v.getPlateNumber());
+                            }
+                        }
+                        return ao;
+                    })
+                    .collect(Collectors.toList());
+            vo.setAdjustOptions(adjustList);
+        }
+
         return vo;
     }
 
@@ -128,9 +175,13 @@ public class ReservationServiceImpl implements ReservationService {
                 throw new BusinessException("该时间段已满员或不可预约");
             }
 
-            // 锁内校验主教练
-            if (!schedule.getCoachId().equals(student.getMainCoachId())) {
-                throw new BusinessException("当前阶段只能预约自己的主教练");
+            // 锁内校验：主教练预约 → schedule.coach 必须是主教练；调剂预约 → 允许其他教练
+            boolean adjusted = dto.isAdjusted();
+            if (!adjusted && !schedule.getCoachId().equals(student.getMainCoachId())) {
+                throw new BusinessException("非主教练排班，请使用调剂预约");
+            }
+            if (adjusted && schedule.getCoachId().equals(student.getMainCoachId())) {
+                throw new BusinessException("主教练有空位，无需调剂预约");
             }
 
             // 锁内校验重复预约
@@ -155,7 +206,11 @@ public class ReservationServiceImpl implements ReservationService {
             r.setReservationDate(schedule.getScheduleDate());
             r.setTimeSlot(schedule.getTimeSlot());
             r.setStatus("SUCCESS");
-            r.setIsAdjusted(0);
+            r.setIsAdjusted(adjusted ? 1 : 0);
+            if (adjusted) {
+                r.setAdjustReason(StringUtils.hasText(dto.getAdjustReason())
+                        ? dto.getAdjustReason() : "主教练当前时间段已满，选择其他教练临时练车");
+            }
             r.setCreateTime(LocalDateTime.now());
             reservationMapper.insert(r);
 

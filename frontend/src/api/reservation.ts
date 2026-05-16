@@ -7,9 +7,9 @@ export function getReservationOptions(date: string, timeSlot: string) {
   return request.get<ApiResult<ReservationOption>>('/reservations/options', { params: { date, timeSlot } })
 }
 
-/** 创建预约（仅学员） */
-export function createReservation(scheduleId: number) {
-  return request.post<ApiResult<Reservation>>('/reservations', { scheduleId })
+/** 创建预约（仅学员） — M7 支持调剂 */
+export function createReservation(scheduleId: number, adjusted = false, adjustReason?: string) {
+  return request.post<ApiResult<Reservation>>('/reservations', { scheduleId, adjusted, adjustReason })
 }
 
 /** 取消预约 */

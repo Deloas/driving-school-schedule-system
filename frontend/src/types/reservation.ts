@@ -22,6 +22,18 @@ export interface Reservation {
   cancelTime: string
 }
 
+export interface AdjustOption {
+  scheduleId: number
+  coachId: number
+  coachName: string
+  vehicleId: number
+  plateNumber: string
+  maxStudents: number
+  currentStudents: number
+  remainCount: number
+  recommendReason: string
+}
+
 export interface ReservationOption {
   mainCoachOption: {
     scheduleId: number
@@ -37,6 +49,8 @@ export interface ReservationOption {
     available: boolean
     message: string
   }
+  /** M7：可调剂教练列表 */
+  adjustOptions: AdjustOption[] | null
 }
 
 export interface ReservationQuery {
