@@ -1,0 +1,34 @@
+# Java / Maven
+backend/target/
+*.class
+*.jar
+*.war
+
+# Node / Vue
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+node_modules/
+dist/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Docker local data
+mysql-data/
+redis-data/

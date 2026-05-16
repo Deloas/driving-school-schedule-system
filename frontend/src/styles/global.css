@@ -1,0 +1,36 @@
+/* ============================================ */
+/* Tailwind CSS 指令                               */
+/* ============================================ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================ */
+/* 全局基础样式                                     */
+/* 设计方向：智能调度驾驶舱 + 清爽业务管理台          */
+/* ============================================ */
+
+/* 页面背景：低饱和冷灰白，区别于纯白色后台 */
+body {
+  @apply bg-gray-50 text-gray-800;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 卡片通用样式：柔和的阴影和圆角，营造层次感 */
+.card {
+  @apply bg-white rounded-xl shadow-sm border border-gray-100;
+}
+
+/* 状态标签基础样式 */
+.status-badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+/* 预约容量进度条 — 满员时变为橙色告警 */
+.capacity-bar {
+  @apply w-full h-2 bg-gray-100 rounded-full overflow-hidden;
+}
+.capacity-bar-fill {
+  @apply h-full rounded-full transition-all duration-300;
+}

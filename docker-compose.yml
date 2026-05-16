@@ -1,0 +1,39 @@
+# 驾校学员练车预约与调度管理系统 — Docker Compose
+# 仅用于本地开发时快速启动 MySQL 和 Redis
+# 后端和前端不在 Docker 中启动，使用 IDEA 和终端分别启动
+
+services:
+  # MySQL 8.0 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: driving-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: driving_school_schedule
+      TZ: Asia/Shanghai
+    ports:
+      - "23306:3306"
+    volumes:
+      # 首次启动时自动执行初始化 SQL
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # 持久化数据库数据
+      - mysql-data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+
+  # Redis 7 缓存
+  redis:
+    image: redis:7
+    container_name: driving-redis
+    restart: unless-stopped
+    ports:
+      - "26379:6379"
+    # Redis 无密码（本地开发环境）
+    volumes:
+      - redis-data:/data
+
+volumes:
+  mysql-data:
+  redis-data:

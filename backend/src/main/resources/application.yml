@@ -1,0 +1,19 @@
+# ============================================
+# 驾校学员练车预约与调度管理系统 — 主配置文件
+# 默认激活 dev 开发环境
+# ============================================
+
+spring:
+  profiles:
+    active: dev
+
+  # 排除 UserDetailsService 自动配置 — 避免 Spring Boot 生成默认密码
+  # 本项目使用 JWT 无状态认证，不需要内存中的默认用户
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null

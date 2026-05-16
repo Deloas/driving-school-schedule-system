@@ -1,0 +1,55 @@
+# ============================================
+# 驾校学员练车预约与调度管理系统 — 开发环境配置
+# ============================================
+
+server:
+  port: 28081
+
+spring:
+  # MySQL 数据源配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:23306/driving_school_schedule?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
+
+  # Redis 配置
+  data:
+    redis:
+      host: localhost
+      port: 26379
+      # 本地开发环境 Redis 无密码，如设置密码请在下方配置
+      # password:
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  # 实体类扫描包
+  type-aliases-package: com.drivingschool
+  # Mapper XML 文件位置
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    # 下划线转驼峰
+    map-underscore-to-camel-case: true
+    # SQL 日志（开发环境启用，便于调试）
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      # 主键类型：自增
+      id-type: auto
+      # 逻辑删除字段
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 日志配置
+logging:
+  level:
+    com.drivingschool: debug
+    org.springframework.security: info
