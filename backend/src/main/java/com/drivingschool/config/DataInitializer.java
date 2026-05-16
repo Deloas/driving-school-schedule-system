@@ -10,6 +10,9 @@ import com.drivingschool.student.mapper.StudentMapper;
 import com.drivingschool.vehicle.entity.Vehicle;
 import com.drivingschool.vehicle.mapper.VehicleMapper;
 import lombok.RequiredArgsConstructor;
+
+import java.time.LocalDate;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
@@ -36,6 +39,7 @@ public class DataInitializer implements CommandLineRunner {
     private final CoachMapper coachMapper;
     private final StudentMapper studentMapper;
     private final VehicleMapper vehicleMapper;
+    private final com.drivingschool.schedule.mapper.CoachScheduleMapper scheduleMapper;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -44,7 +48,8 @@ public class DataInitializer implements CommandLineRunner {
         initCoaches();
         initVehicles();
         initStudents();
-        log.info("M3 测试数据初始化完成");
+        initSchedules();
+        log.info("M4 测试数据初始化完成");
     }
 
     // ==================== 教练初始化 ====================
@@ -213,5 +218,41 @@ public class DataInitializer implements CommandLineRunner {
                 log.info("已更新 {} 的 relatedId: {}", username, relatedId);
             }
         }
+    }
+
+    // ==================== 排班初始化（M4） ====================
+
+    private void initSchedules() {
+        List<Coach> coaches = coachMapper.selectList(
+                new LambdaQueryWrapper<Coach>().eq(Coach::getStatus, "NORMAL").orderByAsc(Coach::getId));
+        List<Vehicle> vehicles = vehicleMapper.selectList(
+                new LambdaQueryWrapper<Vehicle>().eq(Vehicle::getStatus, "NORMAL").orderByAsc(Vehicle::getId));
+        if (coaches.isEmpty() || vehicles.isEmpty()) return;
+
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        String[] slots = {"MORNING", "AFTERNOON"};
+
+        for (String slot : slots) {
+            for (int i = 0; i < coaches.size(); i++) {
+                Coach coach = coaches.get(i);
+                // 已有排班则跳过
+                Long count = scheduleMapper.selectCount(new LambdaQueryWrapper<com.drivingschool.schedule.entity.CoachSchedule>()
+                        .eq(com.drivingschool.schedule.entity.CoachSchedule::getCoachId, coach.getId())
+                        .eq(com.drivingschool.schedule.entity.CoachSchedule::getScheduleDate, tomorrow)
+                        .eq(com.drivingschool.schedule.entity.CoachSchedule::getTimeSlot, slot));
+                if (count > 0) continue;
+
+                com.drivingschool.schedule.entity.CoachSchedule s = new com.drivingschool.schedule.entity.CoachSchedule();
+                s.setCoachId(coach.getId());
+                s.setVehicleId(vehicles.get(i % vehicles.size()).getId());
+                s.setScheduleDate(tomorrow);
+                s.setTimeSlot(slot);
+                s.setMaxStudents(5);
+                s.setCurrentStudents(0);
+                s.setStatus("OPEN");
+                scheduleMapper.insert(s);
+            }
+        }
+        log.info("已创建明天上/下午排班，共 {} 名教练", coaches.size());
     }
 }

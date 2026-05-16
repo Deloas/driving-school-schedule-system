@@ -22,6 +22,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'coaches', name: 'CoachManage', component: () => import('@/views/admin/CoachManageView.vue'), meta: { title: '教练管理' } },
       { path: 'students', name: 'StudentManage', component: () => import('@/views/admin/StudentManageView.vue'), meta: { title: '学员管理' } },
       { path: 'vehicles', name: 'VehicleManage', component: () => import('@/views/admin/VehicleManageView.vue'), meta: { title: '车辆管理' } },
+      { path: 'schedules', name: 'ScheduleManage', component: () => import('@/views/admin/ScheduleManageView.vue'), meta: { title: '排班管理' } },
     ],
   },
   {
