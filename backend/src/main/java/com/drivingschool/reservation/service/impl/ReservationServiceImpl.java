@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.drivingschool.coach.entity.Coach;
 import com.drivingschool.coach.mapper.CoachMapper;
+import com.drivingschool.common.constant.RedisKeyConstants;
 import com.drivingschool.common.exception.BusinessException;
 import com.drivingschool.reservation.dto.ReservationCancelDTO;
 import com.drivingschool.reservation.dto.ReservationCreateDTO;
@@ -20,21 +21,28 @@ import com.drivingschool.student.mapper.StudentMapper;
 import com.drivingschool.vehicle.entity.Vehicle;
 import com.drivingschool.vehicle.mapper.VehicleMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
  * 预约业务实现
  * <p>
- * M5 阶段只允许学员预约自己的主教练，不做调剂。
- * 创建和取消预约均使用事务，并用条件 UPDATE 兜底防止超额。
+ * M6 阶段：加入 Redisson 分布式锁（锁粒度 scheduleId），确保并发预约不会超额。
+ * 锁内重新校验所有条件，并以数据库条件 UPDATE 作为最终兜底。
  * </p>
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReservationServiceImpl implements ReservationService {
@@ -44,6 +52,8 @@ public class ReservationServiceImpl implements ReservationService {
     private final StudentMapper studentMapper;
     private final CoachMapper coachMapper;
     private final VehicleMapper vehicleMapper;
+    private final RedissonClient redissonClient;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Override
     public ReservationOptionVO getOptions(Long studentId, LocalDate date, String timeSlot) {
@@ -53,7 +63,6 @@ public class ReservationServiceImpl implements ReservationService {
         ReservationOptionVO vo = new ReservationOptionVO();
         ReservationOptionVO.MainCoachOption opt = new ReservationOptionVO.MainCoachOption();
 
-        // 查询主教练在该日期时间段的排班
         CoachSchedule schedule = scheduleMapper.selectOne(new LambdaQueryWrapper<CoachSchedule>()
                 .eq(CoachSchedule::getCoachId, student.getMainCoachId())
                 .eq(CoachSchedule::getScheduleDate, date)
@@ -66,97 +75,148 @@ public class ReservationServiceImpl implements ReservationService {
             opt.setAvailable(false);
             opt.setMessage("该时间段排班已关闭");
         } else if (schedule.getCurrentStudents() >= schedule.getMaxStudents()) {
-            opt.setCoachId(schedule.getCoachId());
-            opt.setScheduleId(schedule.getId());
-            opt.setCurrentStudents(schedule.getCurrentStudents());
-            opt.setMaxStudents(schedule.getMaxStudents());
-            opt.setRemainCount(0);
+            fillMinimalOption(opt, schedule);
             opt.setAvailable(false);
             opt.setMessage("主教练当前时间段已满员，请选择其他时间段");
-            fillCoachAndVehicle(opt, schedule);
         } else {
-            opt.setScheduleId(schedule.getId());
-            opt.setCoachId(schedule.getCoachId());
-            opt.setCurrentStudents(schedule.getCurrentStudents());
-            opt.setMaxStudents(schedule.getMaxStudents());
-            opt.setRemainCount(schedule.getMaxStudents() - schedule.getCurrentStudents());
-            opt.setScheduleDate(schedule.getScheduleDate().toString());
-            opt.setTimeSlot(schedule.getTimeSlot());
+            fillFullOption(opt, schedule);
             opt.setAvailable(true);
             opt.setMessage("可预约");
-            fillCoachAndVehicle(opt, schedule);
         }
 
         vo.setMainCoachOption(opt);
         return vo;
     }
 
+    // ==================== 创建预约（M6：加入分布式锁 + 限流） ====================
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ReservationVO create(ReservationCreateDTO dto, Long studentId) {
+        Long scheduleId = dto.getScheduleId();
+
+        // --- 1. 防重复点击：学员级限流（轻量） ---
+        String limitKey = RedisKeyConstants.LIMIT_RESERVATION + studentId;
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(limitKey))) {
+            throw new BusinessException("请勿频繁提交预约，请稍后再试");
+        }
+        stringRedisTemplate.opsForValue().set(limitKey, "1", Duration.ofSeconds(5));
+
+        // --- 2. 加锁前基础校验 ---
         Student student = studentMapper.selectById(studentId);
         if (student == null) throw new BusinessException("学员信息不存在");
 
-        // 查询排班
-        CoachSchedule schedule = scheduleMapper.selectById(dto.getScheduleId());
-        if (schedule == null) throw new BusinessException("排班不存在");
-        if (!"OPEN".equals(schedule.getStatus())) throw new BusinessException("该排班未开放预约");
+        // --- 3. Redisson 分布式锁 ---
+        String lockKey = RedisKeyConstants.LOCK_SCHEDULE + scheduleId;
+        RLock lock = redissonClient.getLock(lockKey);
+        boolean locked = false;
 
-        // 校验预约主教练（M5 只允许主教练）
-        if (!schedule.getCoachId().equals(student.getMainCoachId())) {
-            throw new BusinessException("当前阶段只能预约自己的主教练");
+        try {
+            // 等待 3 秒获取锁，锁自动释放时间 10 秒
+            locked = lock.tryLock(3, 10, TimeUnit.SECONDS);
+            if (!locked) {
+                throw new BusinessException("当前预约人数较多，请稍后重试");
+            }
+
+            // --- 4. 锁内重新查询排班（避免使用加锁前可能过期的数据） ---
+            CoachSchedule schedule = scheduleMapper.selectById(scheduleId);
+            if (schedule == null) throw new BusinessException("排班不存在");
+            if (!"OPEN".equals(schedule.getStatus())) throw new BusinessException("该排班未开放预约");
+
+            // 锁内校验容量
+            if (schedule.getCurrentStudents() >= schedule.getMaxStudents()) {
+                throw new BusinessException("该时间段已满员或不可预约");
+            }
+
+            // 锁内校验主教练
+            if (!schedule.getCoachId().equals(student.getMainCoachId())) {
+                throw new BusinessException("当前阶段只能预约自己的主教练");
+            }
+
+            // 锁内校验重复预约
+            Long dup = reservationMapper.selectCount(new LambdaQueryWrapper<Reservation>()
+                    .eq(Reservation::getStudentId, studentId)
+                    .eq(Reservation::getReservationDate, schedule.getScheduleDate())
+                    .eq(Reservation::getTimeSlot, schedule.getTimeSlot())
+                    .eq(Reservation::getStatus, "SUCCESS"));
+            if (dup > 0) throw new BusinessException("你已预约该时间段，不能重复预约");
+
+            // --- 5. 数据库条件 UPDATE 作为最终兜底 ---
+            int updated = reservationMapper.increaseCurrentStudents(scheduleId);
+            if (updated == 0) throw new BusinessException("该时间段已满员或不可预约");
+
+            // --- 6. 创建预约记录 ---
+            Reservation r = new Reservation();
+            r.setStudentId(studentId);
+            r.setMainCoachId(student.getMainCoachId());
+            r.setActualCoachId(schedule.getCoachId());
+            r.setVehicleId(schedule.getVehicleId());
+            r.setScheduleId(schedule.getId());
+            r.setReservationDate(schedule.getScheduleDate());
+            r.setTimeSlot(schedule.getTimeSlot());
+            r.setStatus("SUCCESS");
+            r.setIsAdjusted(0);
+            r.setCreateTime(LocalDateTime.now());
+            reservationMapper.insert(r);
+
+            return toVO(r);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException("预约处理中断，请稍后重试");
+        } finally {
+            // 锁必须释放，且只释放当前线程持有的锁
+            if (locked && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
-
-        // 校验同一日期同一时间段不重复预约
-        Long dup = reservationMapper.selectCount(new LambdaQueryWrapper<Reservation>()
-                .eq(Reservation::getStudentId, studentId)
-                .eq(Reservation::getReservationDate, schedule.getScheduleDate())
-                .eq(Reservation::getTimeSlot, schedule.getTimeSlot())
-                .eq(Reservation::getStatus, "SUCCESS"));
-        if (dup > 0) throw new BusinessException("你已预约该时间段，不能重复预约");
-
-        // 条件更新 current_students（数据库层面防超额）
-        int updated = reservationMapper.increaseCurrentStudents(dto.getScheduleId());
-        if (updated == 0) throw new BusinessException("该时间段已满员或不可预约");
-
-        // 创建预约记录
-        Reservation r = new Reservation();
-        r.setStudentId(studentId);
-        r.setMainCoachId(student.getMainCoachId());
-        r.setActualCoachId(schedule.getCoachId());
-        r.setVehicleId(schedule.getVehicleId());
-        r.setScheduleId(schedule.getId());
-        r.setReservationDate(schedule.getScheduleDate());
-        r.setTimeSlot(schedule.getTimeSlot());
-        r.setStatus("SUCCESS");
-        r.setIsAdjusted(0);
-        r.setCreateTime(LocalDateTime.now());
-        reservationMapper.insert(r);
-
-        return toVO(r);
     }
+
+    // ==================== 取消预约（M6：加锁保护 current_students 减操作） ====================
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void cancel(Long reservationId, ReservationCancelDTO dto, Long operatorId, String operatorRole) {
+        // 查询预约
         Reservation r = reservationMapper.selectById(reservationId);
         if (r == null) throw new BusinessException("预约不存在");
         if (!"SUCCESS".equals(r.getStatus())) throw new BusinessException("该预约不能取消");
 
-        // 学员只能取消自己的，管理员可取消任意
         if ("STUDENT".equals(operatorRole) && !r.getStudentId().equals(operatorId)) {
             throw new BusinessException("只能取消自己的预约");
         }
 
-        // 更新预约状态
-        r.setStatus("CANCELLED");
-        r.setCancelTime(LocalDateTime.now());
-        if (StringUtils.hasText(dto.getReason())) r.setCancelReason(dto.getReason());
-        reservationMapper.updateById(r);
+        // 加排班锁，防止并发取消失败
+        String lockKey = RedisKeyConstants.LOCK_SCHEDULE + r.getScheduleId();
+        RLock lock = redissonClient.getLock(lockKey);
+        boolean locked = false;
 
-        // 减少排班当前人数
-        reservationMapper.decreaseCurrentStudents(r.getScheduleId());
+        try {
+            locked = lock.tryLock(3, 10, TimeUnit.SECONDS);
+            if (!locked) {
+                throw new BusinessException("系统繁忙，请稍后重试");
+            }
+
+            // 锁内更新状态
+            r.setStatus("CANCELLED");
+            r.setCancelTime(LocalDateTime.now());
+            if (StringUtils.hasText(dto.getReason())) {
+                r.setCancelReason(dto.getReason());
+            }
+            reservationMapper.updateById(r);
+
+            // 条件减少当前人数（不会减到负数）
+            reservationMapper.decreaseCurrentStudents(r.getScheduleId());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException("取消处理中断，请稍后重试");
+        } finally {
+            if (locked && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
     }
+
+    // ==================== 查询方法（不变） ====================
 
     @Override
     public Page<ReservationVO> myReservations(Long studentId, Integer page, Integer size) {
@@ -189,19 +249,16 @@ public class ReservationServiceImpl implements ReservationService {
         if (dto.getReservationDate() != null) w.eq(Reservation::getReservationDate, dto.getReservationDate());
         if (StringUtils.hasText(dto.getTimeSlot())) w.eq(Reservation::getTimeSlot, dto.getTimeSlot());
         if (StringUtils.hasText(dto.getStatus())) w.eq(Reservation::getStatus, dto.getStatus());
-        // studentName 模糊搜索：先查 studentId，再过滤
         if (StringUtils.hasText(dto.getStudentName())) {
-            // 简化处理：通过 student 表 name like 查询得到 studentIds
             var students = studentMapper.selectList(new LambdaQueryWrapper<Student>()
                     .like(Student::getName, dto.getStudentName()));
             if (!students.isEmpty()) {
                 w.in(Reservation::getStudentId, students.stream().map(Student::getId).collect(Collectors.toList()));
             } else {
-                w.eq(Reservation::getStudentId, -1L); // 无匹配
+                w.eq(Reservation::getStudentId, -1L);
             }
         }
         w.orderByDesc(Reservation::getCreateTime);
-
         Page<Reservation> p = reservationMapper.selectPage(new Page<>(dto.getPage(), dto.getSize()), w);
         Page<ReservationVO> voPage = new Page<>(p.getCurrent(), p.getSize(), p.getTotal());
         voPage.setRecords(p.getRecords().stream().map(this::toVO).collect(Collectors.toList()));
@@ -209,6 +266,26 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     // ==================== 内部方法 ====================
+
+    private void fillMinimalOption(ReservationOptionVO.MainCoachOption opt, CoachSchedule s) {
+        opt.setScheduleId(s.getId());
+        opt.setCoachId(s.getCoachId());
+        opt.setCurrentStudents(s.getCurrentStudents());
+        opt.setMaxStudents(s.getMaxStudents());
+        opt.setRemainCount(0);
+        fillCoachAndVehicle(opt, s);
+    }
+
+    private void fillFullOption(ReservationOptionVO.MainCoachOption opt, CoachSchedule s) {
+        opt.setScheduleId(s.getId());
+        opt.setCoachId(s.getCoachId());
+        opt.setCurrentStudents(s.getCurrentStudents());
+        opt.setMaxStudents(s.getMaxStudents());
+        opt.setRemainCount(s.getMaxStudents() - s.getCurrentStudents());
+        opt.setScheduleDate(s.getScheduleDate().toString());
+        opt.setTimeSlot(s.getTimeSlot());
+        fillCoachAndVehicle(opt, s);
+    }
 
     private void fillCoachAndVehicle(ReservationOptionVO.MainCoachOption opt, CoachSchedule s) {
         Coach c = coachMapper.selectById(s.getCoachId());
@@ -237,7 +314,6 @@ public class ReservationServiceImpl implements ReservationService {
         vo.setCreateTime(r.getCreateTime());
         vo.setCancelTime(r.getCancelTime());
 
-        // 填充姓名
         Student st = studentMapper.selectById(r.getStudentId());
         if (st != null) { vo.setStudentName(st.getName()); vo.setStudentPhone(st.getPhone()); }
         Coach mc = coachMapper.selectById(r.getMainCoachId());
