@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { getReservationOptions, createReservation, getMyReservations, cancelReservation } from '@/api/reservation'
 import type { ReservationOption, Reservation, AdjustOption } from '@/types/reservation'
 import { showToast } from '@/utils/toast'
+import { getStudentOverview } from '@/api/statistics'
+import type { StudentOverview } from '@/types/statistics'
 
 /** 学员预约练车页 — M7：主教练满员后调剂推荐 */
 const date = ref('')
@@ -10,6 +12,8 @@ const timeSlot = ref<'MORNING' | 'AFTERNOON'>('MORNING')
 const option = ref<ReservationOption | null>(null)
 const loading = ref(false)
 const booking = ref(false)
+const stuOverview = ref<StudentOverview | null>(null)
+onMounted(async () => { try { stuOverview.value = (await getStudentOverview()).data.data } catch {} })
 const myList = ref<Reservation[]>([])
 const myTotal = ref(0)
 fetchMyReservations()
@@ -65,6 +69,15 @@ const statusColor: Record<string, string> = { SUCCESS: 'bg-green-100 text-green-
 
 <template>
   <div class="max-w-4xl mx-auto">
+    <!-- 我的练车进度 -->
+    <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6" v-if="stuOverview">
+      <div class="card p-3 text-center"><div class="text-xs text-gray-400">已完成</div><div class="text-lg font-bold text-primary-600">{{ stuOverview.completedTrainingCount }}</div></div>
+      <div class="card p-3 text-center"><div class="text-xs text-gray-400">预约中</div><div class="text-lg font-bold text-green-600">{{ stuOverview.successReservationCount }}</div></div>
+      <div class="card p-3 text-center"><div class="text-xs text-gray-400">已取消</div><div class="text-lg font-bold text-gray-500">{{ stuOverview.cancelledReservationCount }}</div></div>
+      <div class="card p-3 text-center"><div class="text-xs text-gray-400">缺席</div><div class="text-lg font-bold text-red-500">{{ stuOverview.absentCount }}</div></div>
+      <div class="card p-3 text-center"><div class="text-xs text-gray-400">调剂</div><div class="text-lg font-bold text-amber-600">{{ stuOverview.adjustmentCount }}</div></div>
+      <div class="card p-3 text-center"><div class="text-xs text-gray-400">下次预约</div><div class="text-xs font-medium text-gray-700 mt-1">{{ stuOverview.nextReservation || '暂无' }}</div></div>
+    </div>
     <div class="card p-6 mb-6">
       <h3 class="text-base font-semibold text-gray-700 mb-4">预约练车</h3>
       <div class="flex flex-wrap items-end gap-4">

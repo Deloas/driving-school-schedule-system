@@ -7,6 +7,8 @@ import request from '@/api/request'
 import type { ApiResult } from '@/types/common'
 import type { Reservation } from '@/types/reservation'
 import { showToast } from '@/utils/toast'
+import { getCoachOverview } from '@/api/statistics'
+import type { CoachOverview } from '@/types/statistics'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -16,7 +18,8 @@ const compVisible = ref(false)
 const absForm = ref({ id: 0, reason: '' })
 const absVisible = ref(false)
 
-onMounted(fetchToday)
+const coachOverview = ref<CoachOverview | null>(null)
+onMounted(async () => { fetchToday(); try { coachOverview.value = (await getCoachOverview()).data.data } catch {} })
 
 async function fetchToday() {
   try {
@@ -60,6 +63,14 @@ const slotLabel: Record<string, string> = { MORNING: '上午', AFTERNOON: '下�
     <div class="flex-1 flex flex-col min-w-0">
       <header class="bg-white border-b border-gray-100 px-6 py-4"><h2 class="text-lg font-semibold text-gray-800">教练工作台</h2><p class="text-xs text-gray-500">{{ authStore.username }}</p></header>
       <main class="flex-1 p-6">
+        <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6" v-if="coachOverview">
+          <div class="card p-3 text-center"><div class="text-xs text-gray-400">今日预约</div><div class="text-lg font-bold text-gray-700">{{ coachOverview.todayReservations }}</div></div>
+          <div class="card p-3 text-center"><div class="text-xs text-gray-400">今日完成</div><div class="text-lg font-bold text-green-600">{{ coachOverview.todayCompleted }}</div></div>
+          <div class="card p-3 text-center"><div class="text-xs text-gray-400">今日缺席</div><div class="text-lg font-bold text-red-500">{{ coachOverview.todayAbsent }}</div></div>
+          <div class="card p-3 text-center"><div class="text-xs text-gray-400">待处理</div><div class="text-lg font-bold text-amber-600">{{ coachOverview.upcomingReservations }}</div></div>
+          <div class="card p-3 text-center"><div class="text-xs text-gray-400">累计完成</div><div class="text-lg font-bold text-primary-600">{{ coachOverview.completedTrainingCount }}</div></div>
+          <div class="card p-3 text-center"><div class="text-xs text-gray-400">调剂接收</div><div class="text-lg font-bold text-ink-600">{{ coachOverview.adjustmentReceivedCount }}</div></div>
+        </div>
         <h3 class="text-base font-semibold text-gray-700 mb-4">今日预约名单</h3>
         <div class="card overflow-hidden">
           <table class="w-full text-sm">
