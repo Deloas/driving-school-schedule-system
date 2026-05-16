@@ -131,10 +131,10 @@ public class DataInitializer implements CommandLineRunner {
 
             Student student = createStudentIfNotExists(name, phone, gender, subject, coachId);
 
-            // student001 对应第一个学员（王小明）
-            if (i == 0) {
-                updateOrCreateSysUser("student001", "123456", "STUDENT", student.getId());
-            }
+            // student001 对应王小明, student002 对应李小红, student003 对应赵一鸣
+            if (i == 0) updateOrCreateSysUser("student001", "123456", "STUDENT", student.getId());
+            if (i == 1) updateOrCreateSysUser("student002", "123456", "STUDENT", student.getId());
+            if (i == 2) updateOrCreateSysUser("student003", "123456", "STUDENT", student.getId());
         }
     }
 
