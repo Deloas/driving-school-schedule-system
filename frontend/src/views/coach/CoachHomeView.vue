@@ -1,22 +1,26 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { getCoachTodayReservations } from '@/api/reservation'
+import type { Reservation } from '@/types/reservation'
 
-/**
- * 教练工作台 — M2 阶段：使用真实用户信息
- * <p>
- * 展示当前登录教练的账号，退出登录功能可用。
- * 排班和预约名单将在 M7 阶段实现。
- * </p>
- */
-
+/** 教练工作台 — M5 阶段：增加今日预约名单 */
 const router = useRouter()
 const authStore = useAuthStore()
 
-function handleLogout() {
-  authStore.logout()
-  router.push('/login')
-}
+const todayList = ref<Reservation[]>([])
+
+onMounted(async () => {
+  try {
+    const res = await getCoachTodayReservations()
+    todayList.value = res.data.data?.records || []
+  } catch { /* 暂无预约 */ }
+})
+
+function handleLogout() { authStore.logout(); router.push('/login') }
+
+const slotLabel: Record<string, string> = { MORNING: '上午', AFTERNOON: '下午' }
 </script>
 
 <template>
@@ -32,39 +36,15 @@ function handleLogout() {
           <span class="text-sm font-semibold text-white/90">教练工作台</span>
         </div>
       </div>
-
       <nav class="flex-1 px-3 py-4 space-y-1">
         <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/10 text-white text-sm font-medium">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
           今日排班
         </a>
-        <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:bg-white/5 text-sm transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-          预约名单
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:bg-white/5 text-sm transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          完成练车
-        </a>
-        <a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:bg-white/5 text-sm transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-          工作量统计
-        </a>
       </nav>
-
       <div class="px-3 py-3 border-t border-white/10">
         <button @click="handleLogout" class="flex items-center gap-2 px-3 py-2 w-full rounded-lg text-white/50 hover:text-white/80 hover:bg-white/5 text-sm transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
           退出系统
         </button>
       </div>
@@ -72,31 +52,37 @@ function handleLogout() {
 
     <div class="flex-1 flex flex-col min-w-0">
       <header class="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h2 class="text-lg font-semibold text-gray-800">教练工作台</h2>
-          <p class="text-xs text-gray-500 mt-0.5">查看排班、管理学员预约和练车记录</p>
-        </div>
-        <div class="flex items-center gap-3">
-          <span class="text-sm text-gray-500">{{ authStore.username }}</span>
-          <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 text-xs font-medium">
-            教
-          </div>
-        </div>
+        <div><h2 class="text-lg font-semibold text-gray-800">教练工作台</h2><p class="text-xs text-gray-500 mt-0.5">{{ authStore.username }}</p></div>
       </header>
 
       <main class="flex-1 p-6">
-        <div class="card p-8 text-center">
-          <div class="w-16 h-16 bg-accent-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-gray-700 mb-2">
-            欢迎，{{ authStore.username }} 教练
-          </h3>
-          <p class="text-sm text-gray-500 max-w-md mx-auto">
-            教练工作台 — 今日排班和预约名单将在 M7 阶段实现。
-          </p>
+        <h3 class="text-base font-semibold text-gray-700 mb-4">今日预约名单</h3>
+        <div class="card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500">
+              <tr>
+                <th class="text-left px-4 py-3 font-medium">学员</th>
+                <th class="text-left px-4 py-3 font-medium">手机号</th>
+                <th class="text-center px-4 py-3 font-medium">时段</th>
+                <th class="text-left px-4 py-3 font-medium">车辆</th>
+                <th class="text-center px-4 py-3 font-medium">状态</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              <tr v-if="!todayList.length"><td colspan="5" class="text-center py-10 text-gray-400">今日暂无预约</td></tr>
+              <tr v-for="r in todayList" :key="r.id" class="hover:bg-gray-50/50">
+                <td class="px-4 py-3 font-medium text-gray-800">{{ r.studentName }}</td>
+                <td class="px-4 py-3 text-gray-600">{{ r.studentPhone }}</td>
+                <td class="px-4 py-3 text-center">
+                  <span :class="r.timeSlot==='MORNING'?'bg-blue-50 text-blue-600':'bg-amber-50 text-amber-600'" class="text-xs font-medium px-2 py-0.5 rounded-full">{{ slotLabel[r.timeSlot] || r.timeSlot }}</span>
+                </td>
+                <td class="px-4 py-3 text-gray-600">{{ r.plateNumber || '-' }}</td>
+                <td class="px-4 py-3 text-center">
+                  <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">已预约</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </main>
     </div>

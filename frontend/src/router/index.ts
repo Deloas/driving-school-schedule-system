@@ -33,9 +33,12 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/student',
-    name: 'StudentHome',
     component: () => import('@/views/student/StudentHomeView.vue'),
-    meta: { title: '学员预约', requiresAuth: true, role: 'STUDENT' },
+    meta: { requiresAuth: true, role: 'STUDENT' },
+    children: [
+      { path: '', redirect: '/student/reservations' },
+      { path: 'reservations', name: 'StudentReservations', component: () => import('@/views/student/ReservationView.vue'), meta: { title: '预约练车' } },
+    ],
   },
 ]
 
