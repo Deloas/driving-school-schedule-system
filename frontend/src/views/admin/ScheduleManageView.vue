@@ -7,6 +7,8 @@ import type { Schedule, ScheduleCreateDTO, ScheduleUpdateDTO, ScheduleBatchDTO }
 import type { CoachSimple } from '@/types/coach'
 import type { VehicleSimple } from '@/types/vehicle'
 import PageModal from '@/components/PageModal.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { showToast } from '@/utils/toast'
 
 /** 排班管理页 */
@@ -103,8 +105,8 @@ const slotLabel: Record<string, string> = { MORNING: '上午', AFTERNOON: '下�
 
 <template>
   <div>
-    <!-- 搜索和操作栏 -->
-    <div class="flex flex-wrap items-center gap-3 mb-5">
+    <PageHeader title="排班管理" subtitle="按日期、时段、教练和车辆组织练车资源" />
+    <div class="card p-4 mb-4 flex flex-wrap items-center gap-3">
       <input v-model="query.startDate" type="date" @change="query.page=1;fetchList()"
         class="px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500" />
       <select v-model="query.coachId" @change="query.page=1;fetchList()" class="px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none">
@@ -129,6 +131,7 @@ const slotLabel: Record<string, string> = { MORNING: '上午', AFTERNOON: '下�
 
     <!-- 表格 -->
     <div class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 text-xs text-gray-400">共 {{ total }} 条记录</div>
       <table class="w-full text-sm">
         <thead class="bg-gray-50 text-gray-500">
           <tr>
@@ -143,7 +146,7 @@ const slotLabel: Record<string, string> = { MORNING: '上午', AFTERNOON: '下�
         </thead>
         <tbody class="divide-y divide-gray-50">
           <tr v-if="loading"><td colspan="7" class="text-center py-10 text-gray-400">加载中...</td></tr>
-          <tr v-else-if="!list.length"><td colspan="7" class="text-center py-10 text-gray-400">暂无排班数据</td></tr>
+          <tr v-else-if="!list.length"><td colspan="7" class="text-center py-12 text-sm text-gray-400">当前条件下暂无排班，可调整筛选条件或批量生成排班</td></tr>
           <tr v-for="s in list" :key="s.id" class="hover:bg-gray-50/50">
             <td class="px-4 py-3 font-medium text-gray-800">{{ s.scheduleDate }}</td>
             <td class="px-4 py-3 text-gray-600">{{ s.coachName }}</td>

@@ -8,6 +8,8 @@ import { getStudentSimpleList } from '@/api/student'
 import type { CoachSimple } from '@/types/coach'
 import type { StudentSimple } from '@/types/student'
 import PageModal from '@/components/PageModal.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 /**
  * 账号管理页 — 管理员为教练/学员开通登录账号
@@ -90,7 +92,8 @@ const roleLabel: Record<string, string> = { ADMIN: '管理员', COACH: '教练',
 
 <template>
   <div>
-    <div class="flex flex-wrap items-center gap-3 mb-5">
+    <PageHeader title="账号管理" subtitle="为管理员、教练和学员维护系统登录账号" />
+    <div class="card p-4 mb-4 flex flex-wrap items-center gap-3">
       <input v-model="query.keyword" @keyup.enter="query.page=1;fetchList()" placeholder="搜索账号" class="px-3 py-2 text-sm border border-gray-200 rounded-lg w-40 outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500" />
       <select v-model="query.role" @change="query.page=1;fetchList()" class="px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none">
         <option value="">全部角色</option><option value="ADMIN">管理员</option><option value="COACH">教练</option><option value="STUDENT">学员</option>
@@ -103,6 +106,7 @@ const roleLabel: Record<string, string> = { ADMIN: '管理员', COACH: '教练',
     </div>
 
     <div class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 text-xs text-gray-400">共 {{ total }} 条记录</div>
       <table class="w-full text-sm">
         <thead class="bg-gray-50 text-gray-500">
           <tr>
@@ -111,7 +115,7 @@ const roleLabel: Record<string, string> = { ADMIN: '管理员', COACH: '教练',
         </thead>
         <tbody class="divide-y divide-gray-50">
           <tr v-if="loading"><td colspan="5" class="text-center py-10 text-gray-400">加载中...</td></tr>
-          <tr v-else-if="!list.length"><td colspan="5" class="text-center py-10 text-gray-400">暂无数据</td></tr>
+          <tr v-else-if="!list.length"><td colspan="5" class="text-center py-12 text-sm text-gray-400">暂无账号数据，可为教练或学员开通登录账号</td></tr>
           <tr v-for="u in list" :key="u.id" class="hover:bg-gray-50/50">
             <td class="px-4 py-3 font-medium text-gray-800">{{ u.username }}</td>
             <td class="px-4 py-3 text-center">

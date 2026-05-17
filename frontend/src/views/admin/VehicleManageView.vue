@@ -5,6 +5,8 @@ import { getCoachSimpleList } from '@/api/coach'
 import type { Vehicle, VehicleCreateDTO, VehicleUpdateDTO } from '@/types/vehicle'
 import type { CoachSimple } from '@/types/coach'
 import PageModal from '@/components/PageModal.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { showToast } from '@/utils/toast'
 
 const list = ref<Vehicle[]>([])
@@ -84,7 +86,8 @@ const statusColor: Record<string, string> = { NORMAL: 'bg-green-100 text-green-7
 
 <template>
   <div>
-    <div class="flex flex-wrap items-center gap-3 mb-5">
+    <PageHeader title="车辆管理" subtitle="维护训练车辆、车辆状态与教练绑定关系" />
+    <div class="card p-4 mb-4 flex flex-wrap items-center gap-3">
       <input v-model="query.keyword" @keyup.enter="query.page=1;fetchList()" placeholder="搜索车牌号"
         class="px-3 py-2 text-sm border border-gray-200 rounded-lg w-52 outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500" />
       <select v-model="query.coachId" @change="query.page=1;fetchList()"
@@ -104,6 +107,7 @@ const statusColor: Record<string, string> = { NORMAL: 'bg-green-100 text-green-7
     </div>
 
     <div class="card overflow-hidden">
+      <div class="px-4 py-3 border-b border-gray-100 text-xs text-gray-400">共 {{ total }} 条记录</div>
       <table class="w-full text-sm">
         <thead class="bg-gray-50 text-gray-500">
           <tr>
@@ -116,7 +120,7 @@ const statusColor: Record<string, string> = { NORMAL: 'bg-green-100 text-green-7
         </thead>
         <tbody class="divide-y divide-gray-50">
           <tr v-if="loading"><td colspan="5" class="text-center py-10 text-gray-400">加载中...</td></tr>
-          <tr v-else-if="!list.length"><td colspan="5" class="text-center py-10 text-gray-400">暂无数据</td></tr>
+          <tr v-else-if="!list.length"><td colspan="5"><EmptyState title="暂无车辆数据" description="可新增训练车辆并绑定教练" /></td></tr>
           <tr v-for="v in list" :key="v.id" class="hover:bg-gray-50/50">
             <td class="px-4 py-3 font-medium text-gray-800">{{ v.plateNumber }}</td>
             <td class="px-4 py-3 text-gray-600">{{ v.coachName || '未绑定' }}</td>
