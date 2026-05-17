@@ -45,10 +45,18 @@ public class StudentController {
         return Result.success(studentService.queryPage(dto));
     }
 
-    /** 查询某教练名下学员 — 教练和管理员可用 */
+    /** 查询某教练名下学员 */
     @GetMapping("/coaches/{coachId}/students")
     public Result<Page<StudentVO>> listByCoach(@PathVariable Long coachId, StudentQueryDTO dto) {
         dto.setCoachId(coachId);
+        return Result.success(studentService.queryPage(dto));
+    }
+
+    /** M9.5-B：教练查看自己绑定的学员 */
+    @GetMapping("/students/my")
+    @PreAuthorize("hasRole('COACH')")
+    public Result<Page<StudentVO>> myStudents(StudentQueryDTO dto) {
+        dto.setCoachId(SecurityContextUtils.getCurrentUser().getRelatedId());
         return Result.success(studentService.queryPage(dto));
     }
 

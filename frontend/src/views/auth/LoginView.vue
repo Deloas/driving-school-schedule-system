@@ -2,225 +2,111 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-
-/**
- * 登录页 — M2 阶段：真实登录表单
- * <p>
- * 设计保持 Anthropic frontend-design 的高级感：左右分栏布局，
- * 左侧品牌展示区（墨蓝渐变），右侧登录表单（白底清爽卡片）。
- * 登录成功后根据角色自动跳转到对应首页。
- * </p>
- */
+import AppLogo from '@/components/AppLogo.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
-
-/** 登录表单数据 */
 const username = ref('')
 const password = ref('')
-
-/** 错误提示信息 */
 const errorMessage = ref('')
-
-/** 是否正在请求中 */
 const loading = ref(false)
 
-/**
- * 处理登录
- * <p>
- * 调用 authStore.login() 发起真实登录请求。
- * 成功 → 根据角色跳转到对应首页。
- * 失败 → 显示后端返回的中文错误提示。
- * </p>
- */
 async function handleLogin() {
-  // 基础校验
-  if (!username.value.trim()) {
-    errorMessage.value = '请输入账号'
-    return
-  }
-  if (!password.value.trim()) {
-    errorMessage.value = '请输入密码'
-    return
-  }
-
-  loading.value = true
-  errorMessage.value = ''
-
+  if (!username.value.trim()) { errorMessage.value = '请输入账号'; return }
+  if (!password.value.trim()) { errorMessage.value = '请输入密码'; return }
+  loading.value = true; errorMessage.value = ''
   try {
-    // 调用真实登录接口
     await authStore.login(username.value.trim(), password.value)
-
-    // 根据角色跳转到对应首页
-    const roleHomeMap: Record<string, string> = {
-      ADMIN: '/admin',
-      COACH: '/coach',
-      STUDENT: '/student',
-    }
-    router.push(roleHomeMap[authStore.role!] || '/login')
-  } catch (err: any) {
-    // 显示后端返回的中文错误提示（如"账号或密码错误"）
-    const msg = err?.response?.data?.message || '登录失败，请稍后重试'
-    errorMessage.value = msg
-  } finally {
-    loading.value = false
-  }
+    const map: Record<string, string> = { ADMIN: '/admin', COACH: '/coach', STUDENT: '/student' }
+    router.push(map[authStore.role!] || '/login')
+  } catch (err: any) { errorMessage.value = err?.response?.data?.message || '账号或密码错误' }
+  finally { loading.value = false }
 }
+function fillDemo(u: string, p: string) { username.value = u; password.value = p; errorMessage.value = '' }
 
-/** 回车键快捷登录 */
-function handleKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter') {
-    handleLogin()
-  }
-}
+const demoAccounts = [
+  { role: '管理员', user: 'admin', pass: '123456', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  { role: '教练', user: 'coach002', pass: '123456', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  { role: '学员', user: 'student002', pass: '123456', color: 'bg-green-50 text-green-700 border-green-200' },
+]
 </script>
 
 <template>
-  <div class="min-h-screen flex">
-    <!-- ==================== 左侧品牌区 ==================== -->
-    <div class="hidden lg:flex lg:w-5/12 bg-gradient-to-br from-ink-700 via-ink-600 to-primary-700 relative overflow-hidden">
-      <div class="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-      <div class="absolute bottom-0 left-0 w-64 h-64 bg-primary-400/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+  <div class="min-h-screen flex bg-gradient-to-br from-slate-100 via-blue-50/40 to-slate-100">
+    <!-- 左侧品牌面板：深色，右侧圆角 -->
+    <div class="hidden lg:flex lg:w-[44%] xl:w-[40%] relative">
+      <div class="absolute inset-y-0 left-0 right-4 bg-gradient-to-br from-ink-800 via-ink-700 to-primary-800 rounded-r-[2.5rem] shadow-2xl shadow-ink-900/20 flex items-center overflow-hidden">
+        <!-- 背景装饰：训练路线 -->
+        <svg class="absolute inset-0 w-full h-full opacity-[0.06]" viewBox="0 0 500 700" fill="none">
+          <path d="M60 650 Q100 550 200 500 T350 400 Q400 350 380 280 T300 180 Q250 130 200 80" stroke="white" stroke-width="2" stroke-dasharray="8 6" fill="none"/>
+          <circle cx="200" cy="500" r="8" stroke="white" stroke-width="1.5" fill="none"/><circle cx="200" cy="500" r="3" fill="white"/>
+          <circle cx="350" cy="400" r="8" stroke="white" stroke-width="1.5" fill="none"/><circle cx="350" cy="400" r="3" fill="white"/>
+          <circle cx="300" cy="180" r="8" stroke="white" stroke-width="1.5" fill="none"/><circle cx="300" cy="180" r="3" fill="white"/>
+          <circle cx="200" cy="80" r="8" stroke="white" stroke-width="1.5" fill="none"/><circle cx="200" cy="80" r="3" fill="white"/>
+          <text x="155" y="515" fill="white" font-size="10" opacity="0.5">预约</text>
+          <text x="313" y="415" fill="white" font-size="10" opacity="0.5">排班</text>
+          <text x="260" y="195" fill="white" font-size="10" opacity="0.5">练车</text>
+          <text x="155" y="95" fill="white" font-size="10" opacity="0.5">记录</text>
+        </svg>
+        <!-- 半透明装饰圆 -->
+        <div class="absolute -top-32 -right-32 w-80 h-80 bg-primary-400/5 rounded-full" />
+        <div class="absolute -bottom-16 -left-16 w-48 h-48 bg-white/3 rounded-full" />
 
-      <div class="relative z-10 flex flex-col justify-center px-16 text-white">
-        <div class="mb-8">
-          <div class="w-12 h-12 bg-primary-400/30 rounded-xl flex items-center justify-center mb-6">
-            <svg class="w-7 h-7 text-primary-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-            </svg>
-          </div>
-          <h1 class="text-3xl font-bold tracking-tight mb-3">
-            驾校学员练车预约与调度管理系统
-          </h1>
-          <p class="text-primary-100 text-lg font-light">
-            基于教练资源均衡的智能调度平台
-          </p>
-        </div>
+        <!-- 内容 -->
+        <div class="relative z-10 px-12 xl:px-16 2xl:px-20 w-full text-white">
+          <div class="mb-8"><div class="w-11 h-11 bg-white/15 rounded-2xl flex items-center justify-center mb-5"><svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke-dasharray="4 4" opacity="0.4"/></svg></div><div class="text-lg font-bold tracking-wide opacity-90">驾校调度系统</div></div>
+          <h1 class="text-[26px] xl:text-[30px] font-extrabold tracking-tight leading-tight mb-3">驾校学员练车预约与调度管理系统</h1>
+          <p class="text-white/65 text-sm font-light mb-12">基于教练资源均衡的智能练车预约平台</p>
 
-        <p class="text-white/80 text-sm leading-relaxed max-w-md">
-          让每一次练车预约都有秩序，让每一位教练负载更均衡。
-        </p>
-
-        <div class="mt-12 space-y-3">
-          <div class="flex items-center gap-3 text-white/70 text-sm">
-            <svg class="w-4 h-4 text-primary-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>学员在线预约练车，优先主教练</span>
-          </div>
-          <div class="flex items-center gap-3 text-white/70 text-sm">
-            <svg class="w-4 h-4 text-primary-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>主教练满员自动推荐调剂方案</span>
-          </div>
-          <div class="flex items-center gap-3 text-white/70 text-sm">
-            <svg class="w-4 h-4 text-primary-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <span>容量控制 + 车辆校验，资源均衡调度</span>
+          <!-- 能力卡片 -->
+          <div class="space-y-3">
+            <div class="flex items-center gap-3 bg-white/8 rounded-xl px-4 py-3 text-sm"><div class="w-2 h-2 rounded-full bg-primary-300 flex-shrink-0" /><span class="text-white/75">按日期和时段在线预约练车</span></div>
+            <div class="flex items-center gap-3 bg-white/8 rounded-xl px-4 py-3 text-sm"><div class="w-2 h-2 rounded-full bg-primary-300 flex-shrink-0" /><span class="text-white/75">教练、车辆、容量统一资源调度</span></div>
+            <div class="flex items-center gap-3 bg-white/8 rounded-xl px-4 py-3 text-sm"><div class="w-2 h-2 rounded-full bg-primary-300 flex-shrink-0" /><span class="text-white/75">主教练满员时推荐可调剂教练</span></div>
+            <div class="flex items-center gap-3 bg-white/8 rounded-xl px-4 py-3 text-sm"><div class="w-2 h-2 rounded-full bg-primary-300 flex-shrink-0" /><span class="text-white/75">练车完成后自动生成训练记录</span></div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ==================== 右侧登录表单区 ==================== -->
-    <div class="flex-1 flex items-center justify-center px-8 bg-gray-50">
-      <div class="w-full max-w-sm">
-        <div class="lg:hidden mb-10 text-center">
-          <h1 class="text-2xl font-bold text-ink-700">驾校练车预约系统</h1>
-          <p class="text-gray-500 text-sm mt-1">智能调度平台</p>
-        </div>
+    <!-- 右侧登录区 -->
+    <div class="flex-1 flex items-center justify-center px-6 py-10">
+      <div class="w-full max-w-[440px]">
+        <div class="lg:hidden mb-8 text-center"><div class="flex justify-center mb-3"><AppLogo /></div><h1 class="text-xl font-bold text-ink-700">驾校练车预约系统</h1></div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <h2 class="text-lg font-semibold text-gray-800 mb-1">登录系统</h2>
-          <p class="text-sm text-gray-500 mb-6">使用你的账号登录驾校练车预约系统</p>
+        <!-- 登录卡片 -->
+        <div class="bg-white rounded-2xl shadow-xl shadow-gray-200/60 border border-gray-100/80 p-8">
+          <div class="flex items-center gap-2.5 mb-5"><div class="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center"><svg class="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3" stroke-linecap="round"/></svg></div><span class="text-sm font-semibold text-gray-500">驾校调度系统</span></div>
+          <h2 class="text-xl font-bold text-gray-800 mb-1">登录系统</h2>
+          <p class="text-sm text-gray-400 mb-6">使用账号进入对应工作平台</p>
 
-          <!-- 登录表单 -->
-          <form @submit.prevent="handleLogin" @keydown="handleKeydown" class="space-y-4">
-            <!-- 账号输入框 -->
+          <form @submit.prevent="handleLogin" class="space-y-4">
             <div>
-              <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">
-                账号
-              </label>
-              <input
-                v-model="username"
-                type="text"
-                autocomplete="username"
-                placeholder="请输入登录账号"
-                class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all duration-200 bg-gray-50/50 focus:bg-white"
-              />
+              <label class="block text-xs font-medium text-gray-500 mb-1.5">账号</label>
+              <input v-model="username" type="text" placeholder="请输入登录账号" class="w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/15 focus:border-primary-400 outline-none bg-gray-50 transition-colors" />
             </div>
-
-            <!-- 密码输入框 -->
             <div>
-              <label class="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5">
-                密码
-              </label>
-              <input
-                v-model="password"
-                type="password"
-                autocomplete="current-password"
-                placeholder="请输入登录密码"
-                class="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all duration-200 bg-gray-50/50 focus:bg-white"
-              />
+              <label class="block text-xs font-medium text-gray-500 mb-1.5">密码</label>
+              <input v-model="password" type="password" placeholder="请输入登录密码" class="w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/15 focus:border-primary-400 outline-none bg-gray-50 transition-colors" />
             </div>
-
-            <!-- 错误提示 -->
-            <div
-              v-if="errorMessage"
-              class="flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2"
-            >
-              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+            <div v-if="errorMessage" class="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2.5 flex items-center gap-2">
+              <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
               <span>{{ errorMessage }}</span>
             </div>
-
-            <!-- 登录按钮 -->
-            <button
-              type="submit"
-              :disabled="loading"
-              class="w-full py-3 px-4 bg-ink-600 hover:bg-ink-700 active:bg-ink-800 text-white font-medium rounded-xl transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
-            >
-              <svg
-                v-if="loading"
-                class="animate-spin w-4 h-4 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <span>{{ loading ? '正在登录...' : '登 录' }}</span>
+            <button type="submit" :disabled="loading" class="w-full py-3.5 px-4 bg-ink-600 hover:bg-ink-700 active:bg-ink-800 text-white font-semibold rounded-xl disabled:opacity-50 transition-all text-sm shadow-sm shadow-ink-900/10">
+              {{ loading ? '登录中...' : '登录系统' }}
             </button>
           </form>
 
-          <!-- 测试账号提示 -->
-          <div class="mt-6 p-3 bg-gray-50 rounded-lg">
-            <p class="text-xs text-gray-400 mb-2">M2 测试账号（点击自动填充）</p>
-            <div class="space-y-1.5">
-              <button
-                @click="username = 'admin'; password = '123456'"
-                class="block w-full text-left text-xs text-gray-500 hover:text-primary-600 hover:bg-primary-50/50 rounded-md px-2 py-1 transition-colors"
-              >
-                <span class="font-medium text-gray-600">管理员：</span>admin / 123456
-              </button>
-              <button
-                @click="username = 'coach001'; password = '123456'"
-                class="block w-full text-left text-xs text-gray-500 hover:text-primary-600 hover:bg-primary-50/50 rounded-md px-2 py-1 transition-colors"
-              >
-                <span class="font-medium text-gray-600">教练：</span>coach001 / 123456
-              </button>
-              <button
-                @click="username = 'student001'; password = '123456'"
-                class="block w-full text-left text-xs text-gray-500 hover:text-primary-600 hover:bg-primary-50/50 rounded-md px-2 py-1 transition-colors"
-              >
-                <span class="font-medium text-gray-600">学员：</span>student001 / 123456
-              </button>
+          <!-- 演示账号 -->
+          <div class="mt-6 pt-5 border-t border-gray-100">
+            <p class="text-xs text-gray-400 font-medium mb-3">演示账号</p>
+            <div class="grid grid-cols-3 gap-2">
+              <div v-for="d in demoAccounts" :key="d.role" @click="fillDemo(d.user, d.pass)" :class="[d.color, 'border rounded-xl px-3 py-2.5 text-center cursor-pointer hover:shadow-sm transition-shadow']">
+                <div class="text-xs font-semibold mb-0.5">{{ d.role }}</div>
+                <div class="text-[11px] opacity-70">{{ d.user }}</div>
+                <div class="text-[11px] opacity-50">{{ d.pass }}</div>
+              </div>
             </div>
           </div>
         </div>
